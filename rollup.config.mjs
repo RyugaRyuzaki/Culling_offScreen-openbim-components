@@ -41,4 +41,12 @@ const configInput3 = {
 	},
 	plugins,
 };
-export default [configInput1, configInput2, configInput3];
+const configInput4 = {
+	input: "worker/StreamConverter/IfcStreamConverterWorker.ts",
+	output: {
+		file: "public/IfcStreamConverterWorker.js",
+		format: "esm",
+	},
+	plugins,
+};
+export default [configInput4];

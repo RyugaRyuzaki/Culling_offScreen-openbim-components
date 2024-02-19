@@ -3,7 +3,7 @@ import * as OBC from "openbim-components";
 import { FragmentsGroup } from "bim-fragment";
 import { InstancedMesh } from "three";
 
-import { FragmentMesh } from "bim-fragment/fragment-mesh";
+import * as FRAG from "bim-fragment";
 
 /**
  * A simple implementation of bounding box that works for fragments. The resulting bbox is not 100% precise, but
@@ -21,6 +21,7 @@ export class FragmentBoundingBox implements OBC.Disposable {
     this._absoluteMin = FragmentBoundingBox.newBound( true );
     this._absoluteMax = FragmentBoundingBox.newBound( false );
   }
+  onDisposed!: OBC.Event<any>;
 
   static getDimensions( bbox: THREE.Box3 ) {
     const { min, max } = bbox;
@@ -104,7 +105,7 @@ export class FragmentBoundingBox implements OBC.Disposable {
     }
   }
 
-  addMesh( mesh: FragmentMesh | THREE.InstancedMesh ) {
+  addMesh( mesh: FRAG.FragmentMesh | THREE.InstancedMesh ) {
     if ( !mesh.geometry.index ) {
       return;
     }

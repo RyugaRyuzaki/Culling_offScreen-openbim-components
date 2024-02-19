@@ -2,9 +2,11 @@ import * as THREE from 'three'
 import * as WEBIFC from "web-ifc";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils";
 import { signal } from "@preact/signals-react";
-import { Fragment, FragmentsGroup, GeometryUtils } from 'bim-fragment';
+import * as FRAGS from 'bim-fragment';
 import { FragmentBoundingBox } from './FragmentBoundingBox';
 import { toCompositeID } from "./Misc";
+
+
 interface IBufferGeometry {
   vertexData: Float32Array;
   indexData: Uint32Array
@@ -37,7 +39,7 @@ export function disposeSignal() {
 
 
 export class DataConverterSignal {
-  private _model = new FragmentsGroup();
+  private _model = new FRAGS.FragmentsGroup();
 
   private _fragmentKey = 0;
 
@@ -50,7 +52,7 @@ export class DataConverterSignal {
 
   cleanUp() {
     this._fragmentKey = 0;
-    this._model = new FragmentsGroup();
+    this._model = new FRAGS.FragmentsGroup();
     this._bbox.dispose()
     this._keyFragmentMap = {};
     this._itemKeyMap = {};
@@ -126,7 +128,7 @@ export class DataConverterSignal {
         continue;
       }
 
-      const fragment = new Fragment( constructBuffer, material, instances.length );
+      const fragment = new FRAGS.Fragment( constructBuffer, material, instances.length );
       this._keyFragmentMap[this._fragmentKey] = fragment.id;
 
       const previousIDs = new Set<number>();
@@ -198,8 +200,8 @@ export class DataConverterSignal {
         }
       }
 
-      const geometry = GeometryUtils.merge( [sortedGeometries], true );
-      const fragment = new Fragment( geometry, material, 1 );
+      const geometry = FRAGS.GeometryUtils.merge( [sortedGeometries], true );
+      const fragment = new FRAGS.Fragment( geometry, material, 1 );
       this._keyFragmentMap[this._fragmentKey] = fragment.id;
 
       for ( const id of sortedIDs ) {

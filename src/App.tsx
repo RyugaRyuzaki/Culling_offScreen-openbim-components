@@ -1,9 +1,10 @@
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import * as OBC from "openbim-components";
 import "./App.css";
 import { Culling, IfcWorker } from "./IfcWorker";
 import Stats from "stats.js";
+
 function App() {
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	useEffect(() => {
@@ -39,19 +40,19 @@ async function initScene(components: OBC.Components, container: HTMLDivElement) 
 	components.tools.add("77e3066d-c402-4d77-b3bf-3f1dce9a9576", grid);
 	const customEffects = (components.renderer as OBC.PostproductionRenderer).postproduction.customEffects;
 	customEffects.excludedMeshes.push(grid.get());
-	const toolbar = new OBC.Toolbar(components);
-	components.ui.addToolbar(toolbar);
+	const matrix = new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
+	const matrixInverse = matrix.clone().transpose();
+	scene.matrix.premultiply(matrix).multiply(matrixInverse);
+	// camera.se
 	const ifcWorker = new IfcWorker(components);
-	const culling = new Culling(components);
-	const cacher = new OBC.FragmentCacher(components);
-	//load
-	const loadButton = new OBC.Button(components);
-	loadButton.materialIcon = "download";
-	loadButton.tooltip = "Load model";
-	toolbar.addChild(loadButton);
-
-	loadButton.onClick.add(ifcWorker.loadModel);
-
+	new Culling(components);
+	const toolbar = new OBC.Toolbar(components);
+	const main = new OBC.Button(components);
+	main.materialIcon = "account_tree";
+	main.tooltip = "List Buckets";
+	main.onClick.add(ifcWorker.loadModel);
+	toolbar.addChild(main);
+	components.ui.addToolbar(toolbar);
 	const stats = new Stats();
 	stats.showPanel(2);
 	document.body.append(stats.dom);

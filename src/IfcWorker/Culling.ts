@@ -67,10 +67,6 @@ export class Culling
     private _currentVisibleMeshes = new Set<string>();
     private _recentlyHiddenMeshes = new Set<string>();
 
-    private readonly _transparentMat = new THREE.MeshBasicMaterial( {
-        transparent: true,
-        opacity: 0,
-    } );
 
     private _colors = { r: 0, g: 0, b: 0, i: 0 };
     private worker!: Worker
@@ -86,7 +82,6 @@ export class Culling
         this.enabled = false;
         this._currentVisibleMeshes.clear();
         this._recentlyHiddenMeshes.clear();
-        this._transparentMat.dispose();
         this._meshColorMap.clear();
         this._visibleMeshes = [];
         this.worker?.terminate();
@@ -136,8 +131,8 @@ export class Culling
             for ( const mat of material ) {
                 if ( this.isTransparent( mat ) ) {
                     const newColor = { ...colorMaterial }
-                    newColor.transparent = mat.transparent
-                    newColor.opacity = mat.opacity
+                    newColor.transparent = true
+                    newColor.opacity = 0
                     matArray.push( newColor );
                 } else {
                     transparentOnly = false;
@@ -178,10 +173,11 @@ export class Culling
         this._meshes.set( mesh.uuid, mesh );
         return instanceMesh
     }
-
+    private before = 0
     updateVisibility = async () => {
         if ( !this.enabled ) return;
         if ( !this.needsUpdate ) return;
+        this.before = performance.now()
         const camera = this.components.camera.get();
         camera.updateMatrix();
         const cameraData = {
@@ -216,6 +212,7 @@ export class Culling
             if ( mesh === undefined ) continue;
             mesh.visible = false;
         }
+        console.log( `Time:${( performance.now() - this.before ) / 1000}s` );
     };
 
 
@@ -259,5 +256,6 @@ export class Culling
         };
     }
 }
+
 
 OBC.ToolComponent.libraryUUIDs.add( Culling.uuid );
