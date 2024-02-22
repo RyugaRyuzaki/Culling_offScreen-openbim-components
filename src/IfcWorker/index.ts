@@ -68,9 +68,10 @@ export class IfcWorker extends OBC.Component<Worker> implements OBC.Disposable {
       if ( !IfcGeometriesSignal.value || !IfcPropertiesSignal.value ) return;
       const model = await this._DataConverterSignal.generate( IfcGeometriesSignal.value, IfcPropertiesSignal.value )
       const scene = this.components.scene.get()
+
       scene.add( model )
-      console.log( model.children );
-      this.updateCuller( model )
+      await this.updateCuller( model )
+      await this.updateFragment( model )
       geometryWorker.terminate();
       propertyWorker.terminate();
       this._DataConverterSignal.cleanUp()
@@ -79,22 +80,7 @@ export class IfcWorker extends OBC.Component<Worker> implements OBC.Disposable {
     } )
 
   }
-  onMessageStream( dataArray: Uint8Array ) {
-    const streamWorker = new Worker( IfcStreamConverterWorkerPath )
-    streamWorker.postMessage( { dataSend: dataArray } );
-    streamWorker.onmessage = async ( e: any ) => {
-      const { command, dataReceive } = e.data
-      switch ( command ) {
-        case commandType.onError: break;
-        case commandType.onAssetStreamed:
-          console.log( dataReceive );
-          break;
-        case commandType.onGeometryStreamed:
-          console.log( dataReceive );
-          break;
-      }
-    }
-  }
+
   loadModel = () => {
     const input = document.createElement( "input" );
     input.setAttribute( "type", "file" );
@@ -108,20 +94,19 @@ export class IfcWorker extends OBC.Component<Worker> implements OBC.Disposable {
     };
     input.remove();
   }
-  loadStreamModel = () => {
-    const input = document.createElement( "input" );
-    input.setAttribute( "type", "file" );
-    input.setAttribute( "accept", `.ifc` );
-    input.click();
-    input.onchange = async ( e: any ) => {
-      const file = e.target?.files[0] as File;
-      const buffer = await file.arrayBuffer()
-      const dataArray = new Uint8Array( buffer );
-      this.onMessageStream( dataArray )
-    };
-    input.remove();
-  }
 
+  private async updateFragment( model: FRAG.FragmentsGroup ) {
+    const fragments = await this.components.tools.get( OBC.FragmentManager )
+    const highlighter = await this.components.tools.get( OBC.FragmentHighlighter )
+    if ( !fragments ) return
+    for ( const fragment of model.items ) {
+      fragment.group = model;
+      fragments.list[fragment.id] = fragment;
+      this.components.meshes.push( fragment.mesh );
+    }
+    fragments.groups.push( model );
+    if ( highlighter ) highlighter.update()
+  }
 
   private async updateCuller( model: FRAG.FragmentsGroup ) {
     const culling = await this.components.tools.get( Culling )
@@ -154,5 +139,6 @@ export class IfcWorker extends OBC.Component<Worker> implements OBC.Disposable {
     if ( !culling ) return
     culling.needsUpdate = true
   }
+
 }
 OBC.ToolComponent.libraryUUIDs.add( IfcWorker.uuid );

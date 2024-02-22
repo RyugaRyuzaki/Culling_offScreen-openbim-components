@@ -43,16 +43,119 @@ async function initScene(components: OBC.Components, container: HTMLDivElement) 
 	const matrix = new THREE.Matrix4().set(1, 0, 0, 0, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1);
 	const matrixInverse = matrix.clone().transpose();
 	scene.matrix.premultiply(matrix).multiply(matrixInverse);
-	// camera.se
+	// highlight
+	const fragments = new OBC.FragmentManager(components);
+	const highlighter = new OBC.FragmentHighlighter(components);
+	(components.renderer as OBC.PostproductionRenderer).postproduction.customEffects.outlineEnabled = true;
+	highlighter.outlineEnabled = true;
+	// color
+
+	const colorChange = new THREE.Color().setRGB(235 / 255, 64 / 255, 52 / 255, "srgb");
+	const materialChange = new THREE.MeshLambertMaterial({ color: colorChange });
+
+	const highlightMaterial = new THREE.MeshBasicMaterial({
+		color: "#BCF124",
+		depthTest: false,
+		opacity: 0.8,
+		transparent: true,
+	});
+
+	highlighter.add("default", [highlightMaterial]);
+	highlighter.outlineMaterial.color.set(0xf0ff7a);
+	const singleSelection = {
+		value: true,
+	};
+
+	let lastSelection: OBC.FragmentIdMap | null;
+	const highlightOnClick = async () => {
+		const result = await highlighter.highlight("default", singleSelection.value);
+		lastSelection = null;
+		if (result) {
+			lastSelection = {};
+			for (const fragment of result.fragments) {
+				const fragmentID = fragment.id;
+				lastSelection[fragmentID] = new Set([result.id]);
+			}
+		}
+	};
+
+	container.addEventListener("click", highlightOnClick);
 	const ifcWorker = new IfcWorker(components);
 	new Culling(components);
 	const toolbar = new OBC.Toolbar(components);
-	const main = new OBC.Button(components);
-	main.materialIcon = "account_tree";
-	main.tooltip = "List Buckets";
-	main.onClick.add(ifcWorker.loadModel);
-	toolbar.addChild(main);
+	// load model btn
+	const loadButton = new OBC.Button(components);
+	loadButton.materialIcon = "download";
+	loadButton.tooltip = "Load model";
+	loadButton.onClick.add(ifcWorker.loadModel);
+	// change color element
+	const changeColor = new OBC.Button(components);
+	changeColor.materialIcon = "account_tree";
+	changeColor.tooltip = "List Buckets";
+	changeColor.onClick.add(() => {
+		changeColorElement();
+	});
 	components.ui.addToolbar(toolbar);
+
+	toolbar.addChild(loadButton);
+	toolbar.addChild(changeColor);
+	function changeColorElement() {
+		if (!lastSelection) return;
+		for (const fragmentID in lastSelection) {
+			const ids = lastSelection[fragmentID] as Set<string>;
+			changeColorItemElement(ids, fragmentID);
+		}
+	}
+	function changeColorItemElement(ids: Set<string>, fragmentID: string) {
+		const fragment = fragments.list[fragmentID];
+		if (!fragment) return;
+		const isBlockFragment = fragment.blocks.count > 1;
+		fragment.mesh.updateMatrixWorld(true);
+
+		if (isBlockFragment) {
+			const newGeometry = new THREE.BufferGeometry();
+			newGeometry.attributes = fragment.mesh.geometry.attributes;
+			newGeometry.index = fragment.mesh.geometry.index;
+			const indices = fragment.mesh.geometry.index.array;
+			// create anew InstancedMesh
+			const newMesh = new THREE.InstancedMesh(newGeometry, materialChange, fragment.capacity);
+			newMesh.frustumCulled = false;
+			newMesh.renderOrder = 999;
+			fragment.mesh.updateMatrixWorld(true);
+			newMesh.applyMatrix4(fragment.mesh.matrixWorld);
+
+			scene.add(newMesh);
+			// get indices that does not exited in ids
+			const newIndex: number[] = [];
+			const originIndex: number[] = [];
+			for (let i = 0; i < indices.length - 2; i += 3) {
+				const index = indices[i];
+				const blockID = fragment.mesh.geometry.attributes.blockID.array;
+				const block = blockID[index];
+				const itemID = fragment.mesh.fragment.getItemID(0, block);
+				if (!ids.has(itemID)) {
+					originIndex.push(indices[i], indices[i + 1], indices[i + 2]);
+				} else {
+					newIndex.push(indices[i], indices[i + 1], indices[i + 2]);
+				}
+			}
+			newMesh.geometry.setIndex(newIndex);
+			fragment.mesh.geometry.setIndex(originIndex);
+			newMesh.instanceMatrix.needsUpdate = true;
+			fragment.mesh.instanceMatrix.needsUpdate = true;
+			// remove indices of existing merge fragment mesh
+		} else {
+			for (const id of ids) {
+				const { instanceID } = fragment.getInstanceAndBlockID(id);
+
+				fragment.mesh.setColorAt(instanceID, colorChange);
+				console.log(colorChange);
+			}
+			fragment.mesh.instanceColor!.needsUpdate = true;
+		}
+		fragment.mesh.updateMatrix();
+	}
+
 	const stats = new Stats();
 	stats.showPanel(2);
 	document.body.append(stats.dom);
@@ -84,10 +187,6 @@ export default App;
 // 	};
 // 	fragmentIfcLoader.settings.webIfc.COORDINATE_TO_ORIGIN = true;
 // 	fragmentIfcLoader.settings.webIfc.OPTIMIZE_PROFILES = true;
-
-// 	const highlighter = new OBC.FragmentHighlighter(components);
-// 	(components.renderer as OBC.PostproductionRenderer).postproduction.customEffects.outlineEnabled = true;
-// 	highlighter.outlineEnabled = true;
 
 // 	const highlightMaterial = new THREE.MeshBasicMaterial({
 // 		color: "#BCF124",
@@ -138,44 +237,3 @@ export default App;
 // 	};
 
 // 	loadButton.onClick.add(loadModel);
-
-// 	function transformItem(ids: Set<string>, fragmentID: string, action: "move" | "copy" | "delete") {
-// 		const fragment = fragments.list[fragmentID];
-// 		if (!fragment) return;
-// 		const isBlockFragment = fragment.blocks.count > 1;
-// 		fragment.mesh.updateMatrixWorld(true);
-
-// 		if (isBlockFragment) {
-// 			const indices = fragment.mesh.geometry.index.array;
-// 			const newIndex: number[] = [];
-// 			const idsSet = new Set(ids);
-// 			for (let i = 0; i < indices.length - 2; i += 3) {
-// 				const index = indices[i];
-// 				const blockID = fragment.mesh.geometry.attributes.blockID.array;
-// 				const block = blockID[index];
-// 				const itemID = fragment.mesh.fragment.getItemID(0, block);
-// 				if (idsSet.has(itemID)) {
-// 					newIndex.push(indices[i], indices[i + 1], indices[i + 2]);
-// 				}
-// 			}
-// 		} else {
-// 			for (const id of ids) {
-// 				const { instanceID } = fragment.getInstanceAndBlockID(id);
-// 				fragment.mesh.getMatrixAt(instanceID, tempMatrix);
-// 				const { x, y, z } = actionVector;
-// 				const elements = tempMatrix.elements;
-// 				elements[12] += x;
-// 				elements[13] += y;
-// 				elements[14] += z;
-// 				fragment.mesh.setMatrixAt(instanceID, tempMatrix);
-// 				fragment.mesh.instanceMatrix.needsUpdate = true;
-// 				// if (action === "move") {
-// 				// 	fragment.mesh.setMatrixAt(instanceID, tempMatrix);
-// 				// 	fragment.mesh.instanceMatrix.needsUpdate = true;
-// 				// } else if (action === "copy") {
-// 				// 	fragment.addInstances([{ ids: Array.from(ids), transform: tempMatrix }]);
-// 				// }
-// 			}
-// 		}
-// 		// fragment.mesh.updateMatrix();
-// 	}
